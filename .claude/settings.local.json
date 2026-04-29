@@ -21,7 +21,9 @@
       "mcp__plugin_playwright_playwright__browser_type",
       "mcp__plugin_playwright_playwright__browser_resize",
       "Bash(npx vercel:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(node:*)",
+      "Bash(lsof -iTCP -sTCP:LISTEN -P)"
     ]
   }
 }

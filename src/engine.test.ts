@@ -130,6 +130,29 @@ describe('Deterministic Naming', () => {
     const c = createColor('#E34F5B')
     expect(c.name).toMatch(/[\u4e00-\u9fa5]+/)
   })
+
+  it('uses gray-scale words for grayscale colors', () => {
+    const grayNames = ['墨黑', '炭黑', '铁灰', '铅灰', '中灰', '银灰', '烟白', '雪白']
+    const grayHexes = ['#000000', '#404040', '#808080', '#C0C0C0', '#FFFFFF']
+
+    grayHexes.forEach((hex) => {
+      const c = createColor(hex)
+      const hasGrayWord = grayNames.some((w) => c.name.includes(w))
+      expect(hasGrayWord).toBe(true)
+    })
+  })
+
+  it('does not use hue words for grayscale colors', () => {
+    const hueWords = ['赤红', '朱红', '橙红', '琥珀', '金黄', '柠黄']
+    const grayHexes = ['#000000', '#808080', '#FFFFFF']
+
+    grayHexes.forEach((hex) => {
+      const c = createColor(hex)
+      hueWords.forEach((w) => {
+        expect(c.name).not.toContain(w)
+      })
+    })
+  })
 })
 
 describe('Palette Generation', () => {
@@ -162,6 +185,19 @@ describe('Palette Generation', () => {
 
   it('generates 5 unique colors for white (#FFFFFF) in all types', () => {
     const base = createColor('#FFFFFF')
+    const types: PaletteType[] = ['monochrome', 'analogous', 'complementary']
+
+    types.forEach((type) => {
+      const palette = generatePalette(base, type)
+      expect(palette.colors).toHaveLength(5)
+      const hexes = palette.colors.map((c) => c.hex)
+      const uniqueHexes = new Set(hexes)
+      expect(uniqueHexes.size).toBe(5)
+    })
+  })
+
+  it('generates 5 unique colors for medium gray (#808080) in all types', () => {
+    const base = createColor('#808080')
     const types: PaletteType[] = ['monochrome', 'analogous', 'complementary']
 
     types.forEach((type) => {

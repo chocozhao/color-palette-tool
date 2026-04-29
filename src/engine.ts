@@ -138,6 +138,8 @@ const HUE_WORDS = [
   '兰花', '玫瑰', '珊瑚', '宝石红', '猩红', '绯红',
 ]
 
+const GRAY_WORDS = ['墨黑', '炭黑', '铁灰', '铅灰', '中灰', '银灰', '烟白', '雪白']
+
 // 200 single-character suffixes; combined in pairs for 40,000 unique suffixes
 const SUFFIX_CHARS = [
   '霞', '雾', '光', '影', '焰', '波', '风', '晨', '暮', '霭',
@@ -168,21 +170,54 @@ function getSuffixPair(index: number): string {
   return a + b
 }
 
+function getLightnessWord(l: number): string {
+  // 5 buckets: 极暗 | 深沉 | 中等 | 柔和 | 浅淡
+  if (l <= 20) return LIGHTNESS_WORDS[0]
+  if (l <= 40) return LIGHTNESS_WORDS[1]
+  if (l <= 60) return LIGHTNESS_WORDS[2]
+  if (l <= 80) return LIGHTNESS_WORDS[3]
+  return LIGHTNESS_WORDS[4]
+}
+
+function getSaturationWord(s: number): string {
+  // 4 buckets: 灰调 | 自然 | 鲜明 | 浓烈
+  if (s <= 25) return SATURATION_WORDS[0]
+  if (s <= 50) return SATURATION_WORDS[1]
+  if (s <= 75) return SATURATION_WORDS[2]
+  return SATURATION_WORDS[3]
+}
+
+function getHueWord(h: number): string {
+  // 24 buckets × 15° each
+  const bucket = Math.floor(h / 15) % 24
+  return HUE_WORDS[bucket]
+}
+
+function getGrayWord(l: number): string {
+  // 8 buckets for grayscale, mapped by lightness
+  if (l <= 12) return GRAY_WORDS[0] // 墨黑
+  if (l <= 25) return GRAY_WORDS[1] // 炭黑
+  if (l <= 37) return GRAY_WORDS[2] // 铁灰
+  if (l <= 50) return GRAY_WORDS[3] // 铅灰
+  if (l <= 62) return GRAY_WORDS[4] // 中灰
+  if (l <= 75) return GRAY_WORDS[5] // 银灰
+  if (l <= 87) return GRAY_WORDS[6] // 烟白
+  return GRAY_WORDS[7] // 雪白
+}
+
 export function generateName(hsl: ColorHSL, rgb: ColorRGB): string {
   const hash = (rgb.r << 16) | (rgb.g << 8) | rgb.b
 
-  const lIndex = hash % LIGHTNESS_WORDS.length
-  const sIndex = Math.floor(hash / LIGHTNESS_WORDS.length) % SATURATION_WORDS.length
-  const hIndex =
-    Math.floor(hash / (LIGHTNESS_WORDS.length * SATURATION_WORDS.length)) %
-    HUE_WORDS.length
+  const lightnessWord = getLightnessWord(hsl.l)
+  const saturationWord = getSaturationWord(hsl.s)
 
-  const suffixBase = Math.floor(
-    hash / (LIGHTNESS_WORDS.length * SATURATION_WORDS.length * HUE_WORDS.length),
-  )
-  const suffix = getSuffixPair(suffixBase)
+  // Hue/gray word based on actual values, not hash
+  const hueWord = hsl.s === 0 ? getGrayWord(hsl.l) : getHueWord(hsl.h)
 
-  return `${LIGHTNESS_WORDS[lIndex]}${SATURATION_WORDS[sIndex]}${HUE_WORDS[hIndex]}${suffix}`
+  // Hash is used ONLY for the suffix to guarantee uniqueness across 16M colors
+  const suffix = getSuffixPair(hash)
+
+  return `${lightnessWord}${saturationWord}${hueWord}${suffix}`
 }
 
 /* ------------------------------------------------------------------ */
@@ -289,6 +324,12 @@ function deduplicateColors(colors: Color[]): Color[] {
       const newL = Math.max(2, Math.min(98, color.hsl.l + direction * attempts * 2))
       const newHsl = { ...color.hsl, l: newL }
       color = hslToColor(newHsl)
+    }
+
+    // Fallback: if still duplicated after 10 attempts, force a hue shift to guarantee uniqueness
+    while (result.some((c) => c.hex === color.hex)) {
+      const fallbackHsl = { ...color.hsl, h: normalizeHue(color.hsl.h + 15) }
+      color = hslToColor(fallbackHsl)
     }
 
     result.push(color)

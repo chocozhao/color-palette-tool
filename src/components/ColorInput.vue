@@ -66,6 +66,8 @@ function applySuggestion() {
 }
 
 const previewColor = computed<Color | null>(() => {
+  // 当前输入无效且无建议时，不显示旧的预览
+  if (error.value && !suggestedHex.value) return null
   const hex = suggestedHex.value || props.modelValue
   if (/^#[0-9A-F]{6}$/.test(hex)) {
     return createColor(hex)
@@ -169,6 +171,7 @@ function removeHistory(hex: string, event: MouseEvent) {
       </div>
     </div>
 
+    <!-- Valid color preview -->
     <div
       v-if="previewColor"
       class="rounded-lg px-4 py-3 text-sm"
@@ -180,6 +183,14 @@ function removeHistory(hex: string, event: MouseEvent) {
         <span>RGB: {{ rgbString }}</span>
         <span>HSL: {{ hslString }}</span>
       </div>
+    </div>
+
+    <!-- Invalid input placeholder -->
+    <div
+      v-else-if="error"
+      class="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-400"
+    >
+      <p>等待有效颜色输入...</p>
     </div>
   </div>
 </template>

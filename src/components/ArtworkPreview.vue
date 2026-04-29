@@ -21,7 +21,7 @@ const c = computed(() => ({
   <div class="flex flex-col gap-4">
     <h2 class="text-lg font-semibold text-gray-800">作品预览</h2>
     <p class="text-xs text-gray-500">
-      使用当前调色板五种颜色渲染的界面原型，每种颜色均有使用，无调色板外颜色
+      使用邻近色版五种颜色渲染的界面原型，每种颜色均有使用，无调色板外颜色
     </p>
     <svg
       viewBox="0 0 400 280"
