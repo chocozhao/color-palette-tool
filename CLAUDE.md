@@ -4,59 +4,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository contains a **Color Palette Tool**. The intended implementation is a **Vue 3 + Tailwind CSS** web application with a pure-function color engine, though the current codebase is a minimal Java Maven scaffold.
+A **Vue 3 + Vite + TypeScript + Tailwind CSS** color palette generation tool with a deterministic, pure-function color engine. The authoritative specification is **`color-palette-prd.md`** (Chinese); it defines the data schemas, color engine logic, and artwork preview requirements. Treat it as the source of truth for architectural decisions.
 
-The authoritative specification is **`color-palette-prd.md`** (Chinese). It defines the full technical design including data schemas, color engine logic, and artwork preview requirements. Treat this document as the source of truth for architectural decisions.
+A legacy `pom.xml` exists from the initial Java scaffold but is not part of the active build.
 
-## Build System
+## Build Commands
 
-This is an **Apache Maven** project targeting **Java 8**.
+- `npm run dev` — Start Vite dev server
+- `npm run build` — Type-check with `vue-tsc` and build for production
+- `npm run preview` — Preview the production build
+- `npm run test` — Run Vitest unit tests (watch mode)
+- `npx vitest run` — Run tests once (CI mode)
 
-Common commands:
-- `mvn compile` — Compile the project
-- `mvn test` — Run tests
-- `mvn package` — Build the JAR
-- `mvn clean` — Clean build artifacts
+## Architecture
 
-## Architecture (from PRD)
+### Layer separation
+- **`src/engine.ts`** — Pure functions only. No DOM or Vue dependencies. Handles HEX normalization, RGB/HSL conversions, grayscale strategy, deterministic naming, palette generation, duplicate resolution, accessibility helpers (contrast / WCAG), and export formatting (CSS/JSON/ASE).
+- **`src/types.ts`** — Core TypeScript types: `Color`, `ColorRGB`, `ColorHSL`, `Palette`, `PaletteType`.
+- **`src/composables/`** — Vue reactivity wrappers for stateful concerns (e.g., `useColorHistory` persists to `localStorage`).
+- **`src/components/`** — UI components. `App.vue` orchestrates three computed palettes (`monochrome`, `analogous`, `complementary`) from a single `currentHex` ref.
 
-### Core Data Types
-All color data uses strict TypeScript-style structures (to be implemented in Vue 3):
-- `ColorRGB`: `{ r: number; g: number; b: number }`
-- `ColorHSL`: `{ h: number; s: number; l: number }`
-- `Color`: `{ hex: string; rgb: ColorRGB; hsl: ColorHSL; name: string }`
-- `PaletteType`: `"monochrome" | "analogous" | "complementary"`
-- `Palette`: `{ type: PaletteType; baseColor: Color; colors: Color[] }` (always 5 distinct colors)
-
-### Color Engine Rules
-- **Pure functions only**: No DOM or component state dependencies.
+### Color Engine Rules (from PRD)
 - **Grayscale handling**: When `s === 0`, assign `h = l > 50 ? 210 : 30` (cool vs warm gray).
 - **Duplicate prevention**: If the 5-color palette produces duplicate HEX values, apply deterministic `±2%` lightness adjustments to adjacent colors.
-- **Deterministic naming**: Cover all 16,777,216 colors without hardcoded lookup tables. Use 24 hue buckets (15° steps), 4 saturation buckets, 5 lightness buckets, and a hash-based suffix: `hash = (r << 16) | (g << 8) | b`, `suffixIndex = hash % suffixWords.length`.
+- **Deterministic naming**: Covers all 16,777,216 colors without hardcoded lookup tables. Uses 24 hue buckets (15° steps), 4 saturation buckets, 5 lightness buckets, and a hash-based suffix: `hash = (r << 16) | (g << 8) | b`, `suffixIndex = hash % suffixWords.length`.
 - **Palette generation**:
   - Monochrome: `h ± 5°`, lightness distributed evenly while avoiding extreme black/white.
   - Analogous: offsets `-30°, -15°, 0°, +15°, +30°` with modulo 360°.
   - Complementary: base + base lighter + `180°` complement + complement lighter + gray/neutral derivative.
 
 ### Artwork Preview
-- Render with **SVG** (not simple rectangles).
+- Rendered with **SVG** (not simple rectangles) in `ArtworkPreview.vue`.
 - Color mapping: `canvasBg` (colors[0]), `mainShape` (colors[1]), `subDetail` (colors[2]), `accent` (colors[3]), `typography` (colors[4]).
-- **Constraint**: No colors outside the current palette may appear (no default black lines or backgrounds).
+- **Constraint**: No colors outside the current palette may appear (no default black lines or backgrounds). Opacity variations are allowed.
 
-### Performance
-- Color conversions must live inside Vue `computed` properties.
-- Input validation should use a 100ms `debounce` in `watch`.
-- Clipboard: use `navigator.clipboard.writeText` with UI feedback lasting ≥ 1 second.
+### Performance & UX Patterns
+- Color conversions live inside Vue `computed` properties.
+- Input validation uses a 100ms `debounce` in `watch`.
+- Clipboard: `navigator.clipboard.writeText` with UI feedback lasting ≥ 1 second.
 
-## Development Direction
+## Testing
 
-The PRD includes the following explicit execution instruction for Claude Code:
-
-> "请基于此文档进行开发。首先初始化 Vue 3 + Tailwind CSS 环境，然后按照 **第 2 章定义核心类型**。接着实现 **第 3 章的色彩纯函数引擎**，并为此引擎编写单元测试，确保极端值（如 #000000）能正确生成 5 个唯一色。之后再进行 UI 开发。"
-
-Translation: Initialize Vue 3 + Tailwind CSS, define core types per Chapter 2, implement the pure-function color engine per Chapter 3 with unit tests (verify edge cases like `#000000` produce 5 unique colors), then build the UI.
-
-## Notes
-
-- The project currently has no `src/test/` directory and no testing dependencies configured.
-- No README.md exists yet.
+- Framework: **Vitest** with `jsdom` environment (configured in `vite.config.ts`).
+- Test file: `src/engine.test.ts` covers conversions, grayscale strategy, naming, palette generation (including edge cases like `#000000` and `#FFFFFF`), and accessibility helpers.
+- When modifying the engine, run `npm run test` to verify palette uniqueness invariants, especially for extreme values.

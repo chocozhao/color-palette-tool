@@ -16,6 +16,7 @@ const emit = defineEmits<{
 
 const inputValue = ref(props.modelValue)
 const error = ref('')
+const suggestedHex = ref<string | null>(null)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(
@@ -23,18 +24,31 @@ watch(
   (val) => {
     inputValue.value = val
     error.value = ''
+    suggestedHex.value = null
   },
 )
 
 watch(inputValue, (val) => {
   if (debounceTimer) clearTimeout(debounceTimer)
   error.value = ''
+  suggestedHex.value = null
   debounceTimer = setTimeout(() => {
     const clean = val.trim()
     if (!clean) {
       error.value = '请输入十六进制颜色'
       return
     }
+
+    // 3-char shorthand: show suggestion instead of auto-applying
+    const isShorthand = /^#?[0-9A-Fa-f]{3}$/.test(clean)
+    if (isShorthand) {
+      const normalized = normalizeHex(clean)
+      if (normalized) {
+        suggestedHex.value = normalized
+      }
+      return
+    }
+
     const normalized = normalizeHex(clean)
     if (!normalized) {
       error.value = '请输入有效的十六进制颜色，如 #E34F5B 或 FFF'
@@ -44,9 +58,17 @@ watch(inputValue, (val) => {
   }, 100)
 })
 
+function applySuggestion() {
+  if (suggestedHex.value) {
+    emit('update:modelValue', suggestedHex.value)
+    suggestedHex.value = null
+  }
+}
+
 const previewColor = computed<Color | null>(() => {
-  if (/^#[0-9A-F]{6}$/.test(props.modelValue)) {
-    return createColor(props.modelValue)
+  const hex = suggestedHex.value || props.modelValue
+  if (/^#[0-9A-F]{6}$/.test(hex)) {
+    return createColor(hex)
   }
   return null
 })
@@ -97,6 +119,30 @@ function removeHistory(hex: string, event: MouseEvent) {
       />
     </div>
     <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+
+    <!-- Shorthand suggestion -->
+    <div
+      v-if="suggestedHex"
+      class="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3"
+    >
+      <div
+        class="h-8 w-8 rounded border border-gray-200"
+        :style="{ backgroundColor: suggestedHex }"
+      />
+      <div class="flex-1">
+        <p class="text-sm text-gray-700">
+          检测到简写颜色
+          <code class="rounded bg-white px-1 py-0.5 text-xs font-mono">{{ inputValue.trim() }}</code>
+        </p>
+        <p class="text-xs text-gray-500">展开为 {{ suggestedHex }}</p>
+      </div>
+      <button
+        class="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+        @click="applySuggestion"
+      >
+        应用
+      </button>
+    </div>
 
     <!-- History -->
     <div v-if="history && history.length > 0" class="flex flex-col gap-2">
